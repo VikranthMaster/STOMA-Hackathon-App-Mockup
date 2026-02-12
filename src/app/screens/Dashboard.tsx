@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Header } from "@/app/components/Header";
 import { PlantHero, PlantState } from "@/app/components/PlantHero";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
@@ -10,23 +10,92 @@ import { Label } from "@/app/components/ui/label";
 import { Droplets, RefreshCw, Power, Thermometer, Wind, Activity, Wifi, WifiOff } from "lucide-react";
 import { useTheme } from "@/app/contexts/ThemeContext";
 
+
 export function Dashboard() {
   const [plantState, setPlantState] = useState<PlantState>("NORMAL");
-  const [isOnline, setIsOnline] = useState(true);
+  const [isOnline, setIsOnline] = useState(false);
   const [autoIrrigation, setAutoIrrigation] = useState(true);
   const [forceIrrigation, setForceIrrigation] = useState(false);
   const { darkMode } = useTheme();
 
+  const [leafTemp, setleafTemp] = useState(0);
+  const [airTemp, setairTemp] = useState(0);
+
+  const [showObject, setshowObject] = useState(false);
+  
   const psiValue = plantState === "NORMAL" ? 0.3 : plantState === "STRESS_RISING" ? 0.6 : plantState === "STRESSED" ? 0.85 : 0.2;
   const psiPercentage = psiValue * 100;
+  
+  const ESP32_IP = "http://10.185.62.40";
 
-  const handleSyncNow = () => {
-    alert("Syncing offline decisions with cloud...");
+  const send = async (path:string)=>{
+    try {
+      const res = await fetch(`${ESP32_IP}/${path}`);
+      console.log(res);
+      if (res.status == 200) {
+        console.log("ESP32 synced")
+        setIsOnline(true);
+        Leafvitals();
+        Airvitals();
+      } else {
+        console.log("ESP32 not in range")
+      }
+    } catch (err) {
+      // console.error("ESP32 Not Reachable", err);
+      console.log("NOT REACHABLE");
+    }
+  }
+
+
+  const Leafvitals = async () => {
+    try {
+      const res = await fetch(`${ESP32_IP}/leaf`);
+      const data = await res.json();
+      setleafTemp(data.temperature);
+      console.log(data);
+    } catch (err) {
+      console.log("Couldnt get vitals", err);
+    }
   };
+
+  const Airvitals = async () => {
+    try {
+      const res = await fetch(`${ESP32_IP}/air`);
+      const data = await res.json();
+      setairTemp(data.temperature);
+      console.log(data);
+    } catch (err) {
+      console.log("Couldnt get vitals", err);
+    }
+  }
+
+  useEffect(() => {
+    Leafvitals();
+    Airvitals();
+  }, [])
+
+  setInterval(async () => {
+    const res = await fetch(`${ESP32_IP}/ir`);
+    const data = await res.json();
+    if (data.objectDetected) {
+      console.log("🚨 Object detected!");
+      setshowObject(true);
+    }
+    setshowObject(false);
+  }, 1000);
+
 
   return (
     <div className={`min-h-screen ${darkMode ? "bg-[#1A1A1A]" : "bg-[#FAFAFA]"}`}>
       <Header title="STOMA Dashboard" />
+
+      {showObject && (
+        <div className="fixed top-6 right-6 z-50">
+          <div className="bg-[#EF5350] text-white px-6 py-4 rounded-lg shadow-lg flex items-center gap-3 animate-fade-in">
+            🚨 Object Detected Near Plant!
+          </div>
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
         {/* Plant Hero and State */}
@@ -147,9 +216,9 @@ export function Dashboard() {
             </div>
 
             <Button
-              onClick={handleSyncNow}
+              onClick={() => send("")}
+              disabled={isOnline}
               className="w-full bg-[#66BB6A] hover:bg-[#558B2F] text-white"
-              disabled={!isOnline}
             >
               <RefreshCw className="w-4 h-4 mr-2" />
               Sync Now
@@ -245,7 +314,7 @@ export function Dashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold text-[#66BB6A]">26.5°C</div>
+              <div className="text-4xl font-bold text-[#66BB6A]">{leafTemp}</div>
               <p className={`text-sm ${darkMode ? "text-[#A0A0A0]" : "text-[#689F38]"} mt-1`}>Live</p>
             </CardContent>
           </Card>
@@ -258,7 +327,7 @@ export function Dashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold text-[#66BB6A]">24.8°C</div>
+              <div className="text-4xl font-bold text-[#66BB6A]">{airTemp}</div>
               <p className={`text-sm ${darkMode ? "text-[#A0A0A0]" : "text-[#689F38]"} mt-1`}>Live</p>
             </CardContent>
           </Card>
