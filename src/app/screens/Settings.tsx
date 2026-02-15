@@ -21,44 +21,32 @@ export function Settings() {
     alert("Starting sensor calibration...");
   };
 
-  const handleSaveSettings = async () => {
+  const handleSaveSettings = () => {
     setIsSending(true);
 
-    try {
-      const data = {
-        acres: Number(acres),
-        tankHeight: Number(tankHeight),
-        plantType: plantType,
-        psiThreshold: 0.7,
-        irrigationDuration: 15,
-      };
+    const data = {
+      acres: Number(acres),
+      tankHeight: Number(tankHeight),
+      plantType: plantType,
+      psiThreshold: 0.7,
+      irrigationDuration: 15,
+    };
 
-      const ESP32_IP = "http://10.185.62.40";
-      const response = await fetch(`${ESP32_IP}/settings`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
+    const ESP32_IP = "http://10.185.62.40";
 
-      if (!response.ok) {
-        throw new Error("ESP32 did not accept data");
-      }
+    // 🚀 Send request but DO NOT wait for it
+    fetch(`${ESP32_IP}/settings`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    }).catch(() => {
+      console.log("ESP not reachable");
+    });
 
-      const result = await response.text();
-      console.log(result);
-      setShowSuccess(true);
-      setTimeout(() => {
-        setShowSuccess(false);
-        window.location.href = "/dashboard";
-      }, 1500);
-    } catch (error) {
-      console.error("Error sending to ESP32:", error);
-      alert("Failed to send settings to ESP32");
-    } finally {
-      setIsSending(false);
-    }
+    // 🚀 Navigate immediately
+    navigate("/dashboard");
   };
 
   return (
